@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Faglig AI-Motor</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 50px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h2 { color: #1a73e8; text-align: center; }
+        input { width: 100%; padding: 15px; margin: 20px 0; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; }
+        #svar { margin-top: 25px; padding: 15px; background: #e8f0fe; border-left: 5px solid #1a73e8; display: none; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Akademisk Ekspert-Motor</h2>
+    <input type="text" id="quest" placeholder="Still et faglig spørsmål...">
+    <button onclick="sendTilMotor()">Analyser og Svar</button>
+    <div id="svar"></div>
+</div>
+
+<script>
+    async function sendTilMotor() {
+        const q = document.getElementById("quest").value;
+        const svarDiv = document.getElementById("svar");
+        
+        svarDiv.style.display = "block";
+        svarDiv.innerText = "Søker i faglige kilder...";
+
+        const res = await fetch('/ask', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: q})
+        });
+        
+        const data = await res.json();
+        svarDiv.innerText = data.answer;
+    }
+</script>
+
+</body>
+</html>
