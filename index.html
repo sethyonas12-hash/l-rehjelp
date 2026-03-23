@@ -1,42 +1,322 @@
 <!DOCTYPE html>
-<html>
+<html lang="no">
 <head>
-    <title>Faglig AI-Motor</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 50px; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color: #1a73e8; text-align: center; }
-        input { width: 100%; padding: 15px; margin: 20px 0; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; }
-        #svar { margin-top: 25px; padding: 15px; background: #e8f0fe; border-left: 5px solid #1a73e8; display: none; line-height: 1.6; }
-    </style>
+<meta charset="UTF-8">
+<title>Lærer AI PRO ULTIMATE</title>
+
+<style>
+body {
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  color:white;
+}
+.view { display:none; }
+.active { display:block; }
+
+.card {
+  background:white;
+  color:black;
+  padding:25px;
+  border-radius:20px;
+  margin:15px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+
+button {
+  padding:15px;
+  border:none;
+  border-radius:12px;
+  background:#667eea;
+  color:white;
+  cursor:pointer;
+  width:100%;
+  margin-top:10px;
+}
+
+.topbar {
+  padding:15px;
+  background:black;
+  display:flex;
+  justify-content:space-between;
+}
+
+textarea, input, select {
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border-radius:10px;
+}
+
+.bar {
+  height:10px;
+  background:#ccc;
+  border-radius:10px;
+}
+.fill {
+  height:100%;
+  background:#667eea;
+  width:0%;
+}
+</style>
 </head>
+
 <body>
 
-<div class="container">
-    <h2>Akademisk Ekspert-Motor</h2>
-    <input type="text" id="quest" placeholder="Still et faglig spørsmål...">
-    <button onclick="sendTilMotor()">Analyser og Svar</button>
-    <div id="svar"></div>
+<div class="topbar">
+  <div>XP: <span id="xp">0</span> | 🔥 <span id="streak">0</span></div>
+  <div>Level: <span id="level">1</span></div>
+</div>
+
+<!-- START -->
+<div id="start" class="view active">
+  <div class="card">
+    <h2>Velg nivå</h2>
+    <select id="grade">
+      <option value="">Velg...</option>
+      <option>1-4</option>
+      <option>5-7</option>
+      <option>8-10</option>
+      <option>VG</option>
+    </select>
+    <button onclick="start()">Start</button>
+  </div>
+</div>
+
+<!-- MENU -->
+<div id="menu" class="view">
+  <div class="card">
+    <button onclick="show('chat')">AI lærer</button>
+    <button onclick="show('quiz')">Quiz</button>
+    <button onclick="show('game')">Matte spill</button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="chat" class="view">
+  <div class="card">
+    <textarea id="msg" placeholder="Spør om noe..."></textarea>
+    <button onclick="send()">Send</button>
+    <button onclick="speak()">Les opp</button>
+    <p id="chatOut"></p>
+
+    <div style="margin-top:15px; font-size:14px;">
+      <b>Tips:</b><br>
+      Skriv: "Hjelp meg med 2x + 4 = 10"<br><br>
+      AI-en vil guide deg steg for steg 🎓
+    </div>
+
+    <button onclick="back()">←</button>
+  </div>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" class="view">
+  <div class="card">
+    <p id="q"></p>
+    <input id="ans">
+    <button onclick="check()">Svar</button>
+    <p id="res"></p>
+    <div class="bar"><div class="fill" id="bar"></div></div>
+    <button onclick="back()">←</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="view">
+  <div class="card">
+    <p id="mathQ"></p>
+    <input id="mathA">
+    <button onclick="checkMath()">Svar</button>
+    <button onclick="back()">←</button>
+  </div>
 </div>
 
 <script>
-    async function sendTilMotor() {
-        const q = document.getElementById("quest").value;
-        const svarDiv = document.getElementById("svar");
-        
-        svarDiv.style.display = "block";
-        svarDiv.innerText = "Søker i faglige kilder...";
+let grade = null;
+let xp = parseInt(localStorage.getItem("xp")) || 0;
+let streak = parseInt(localStorage.getItem("streak")) || 0;
+let lastReply = "";
 
-        const res = await fetch('/ask', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({question: q})
-        });
-        
-        const data = await res.json();
-        svarDiv.innerText = data.answer;
-    }
+// 🎓 SUPER PROMPT
+function getTeacherPrompt(){
+return `
+Rolle:
+Du er en ekspertpedagog med over 20 års erfaring. Du hjelper eleven å forstå, ikke bare få svar.
+
+Instrukser:
+- Tilpass til klassetrinn: ${grade}
+- Ikke gi fasit direkte
+- Still spørsmål
+- Bruk analogier
+- Del opp i steg
+- Ros innsats
+
+Regler:
+- Still minst ett spørsmål
+- Kort svar først
+- Bygg forståelse
+
+Mål:
+Brukeren skal forstå og mestre, ikke bare svare riktig.
+`;
+}
+
+updateStats();
+
+// NAV
+function show(id){
+ document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+ document.getElementById(id).classList.add("active");
+}
+function back(){ show("menu"); }
+
+function start(){
+ let g = document.getElementById("grade").value;
+ if(!g){
+  alert("Velg nivå først!");
+  return;
+ }
+ grade = g;
+ newQ();
+ newMath();
+ show("menu");
+}
+
+// 🤖 CHAT
+async function send(){
+ let msg = document.getElementById("msg").value.trim();
+ let out = document.getElementById("chatOut");
+
+ if(!msg){
+  out.innerText="Skriv noe først!";
+  return;
+ }
+
+ out.innerText="Tenker...";
+
+ try{
+  let res = await fetch("http://localhost:3000/ai",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    system: getTeacherPrompt(),
+    message: msg,
+    grade: grade
+   })
+  });
+
+  if(!res.ok) throw new Error();
+
+  let data = await res.json();
+  lastReply = data.reply || "Ingen respons";
+  out.innerText = lastReply;
+
+ } catch {
+  out.innerText="⚠️ AI server ikke tilgjengelig";
+ }
+
+ document.getElementById("msg").value="";
+}
+
+// 🔊 SPEAK
+function speak(){
+ if(!lastReply) return;
+ speechSynthesis.cancel();
+ let u=new SpeechSynthesisUtterance(lastReply);
+ u.lang="no-NO";
+ speechSynthesis.speak(u);
+}
+
+// QUIZ
+let currentQ = 0;
+
+function newQ(){
+ if(!grade) return;
+
+ let max = grade==="1-4" ? 10 : grade==="5-7" ? 20 : 50;
+ let a=Math.floor(Math.random()*max);
+ let b=Math.floor(Math.random()*max);
+ currentQ=a+b;
+
+ document.getElementById("q").innerText=`Hva er ${a}+${b}?`;
+ document.getElementById("ans").value="";
+ document.getElementById("ans").focus();
+}
+
+function check(){
+ let val = parseInt(document.getElementById("ans").value);
+
+ if(isNaN(val)){
+  document.getElementById("res").innerText="Skriv et tall!";
+  return;
+ }
+
+ if(val===currentQ){
+  streak++;
+  xp += 10 * streak;
+  document.getElementById("res").innerText="🔥 Riktig!";
+ } else {
+  streak=0;
+  document.getElementById("res").innerText="❌ Feil!";
+ }
+
+ updateStats();
+ newQ();
+}
+
+// GAME
+let mathAnswer = 0;
+
+function newMath(){
+ if(!grade) return;
+
+ let max = grade==="1-4" ? 10 : grade==="5-7" ? 12 : 20;
+ let a=Math.floor(Math.random()*max);
+ let b=Math.floor(Math.random()*max);
+
+ mathAnswer = a*b;
+ document.getElementById("mathQ").innerText=`${a} × ${b}`;
+ document.getElementById("mathA").value="";
+}
+
+function checkMath(){
+ let val = parseInt(document.getElementById("mathA").value);
+
+ if(isNaN(val)){
+  document.getElementById("mathQ").innerText="Skriv et tall!";
+  return;
+ }
+
+ if(val===mathAnswer){
+  xp+=20;
+  document.getElementById("mathQ").innerText="🔥 Riktig!";
+ } else {
+  document.getElementById("mathQ").innerText="❌ Feil!";
+ }
+
+ updateStats();
+ newMath();
+}
+
+// STATS
+function updateStats(){
+ xp = Math.max(0, xp);
+ streak = Math.max(0, streak);
+
+ document.getElementById("xp").innerText=xp;
+ document.getElementById("streak").innerText=streak;
+
+ let level = Math.floor(xp/100)+1;
+ document.getElementById("level").innerText=level;
+
+ let progress = xp % 100;
+ let bar = document.getElementById("bar");
+ if(bar) bar.style.width = progress + "%";
+
+ localStorage.setItem("xp", xp);
+ localStorage.setItem("streak", streak);
+}
 </script>
 
 </body>
