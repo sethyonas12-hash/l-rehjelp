@@ -1,301 +1,303 @@
+const express = require("express");
+const bodyParser = require("body-parser");
+const app = express();
+
+app.use(bodyParser.json());
+
+/* =========================
+   🧠 "DATABASE" (MIDlertidig)
+========================= */
+let users = [];
+let chats = {};
+
+/* =========================
+   🌐 FRONTEND (HTML)
+========================= */
+app.get("/", (req,res)=>{
+res.send(`
 <!DOCTYPE html>
-<html lang="no">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Lærer AI Enkel</title>
+<title>AI Skole Norge</title>
 
 <style>
-body {
+body{
   margin:0;
   font-family:Arial;
-  background:linear-gradient(135deg,#667eea,#764ba2);
+  display:flex;
+  height:100vh;
+  background:#1e3c72;
   color:white;
 }
-.view { display:none; }
-.active { display:block; }
 
-.card {
-  background:white;
-  color:black;
-  padding:20px;
-  border-radius:15px;
-  margin:15px;
+/* SIDEBAR */
+.sidebar{
+  width:260px;
+  background:#111;
+  padding:15px;
+  overflow:auto;
 }
-
-button {
-  padding:12px;
-  border:none;
-  border-radius:10px;
-  background:#667eea;
-  color:white;
-  width:100%;
-  margin-top:10px;
+.chat{
+  background:#222;
+  padding:10px;
+  margin-top:5px;
+  border-radius:8px;
   cursor:pointer;
 }
 
-.topbar {
+/* MAIN */
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+/* HEADER */
+.top{
   background:black;
   padding:10px;
   display:flex;
   justify-content:space-between;
 }
 
-textarea, input, select {
-  width:100%;
+/* CHAT */
+.messages{
+  flex:1;
+  overflow:auto;
   padding:10px;
-  margin-top:10px;
-  border-radius:8px;
 }
-
-.bar {
-  height:8px;
-  background:#ccc;
+.msg{
+  background:white;
+  color:black;
+  padding:10px;
+  margin-top:5px;
   border-radius:10px;
 }
-.fill {
-  height:100%;
+
+/* INPUT */
+.input{
+  display:flex;
+}
+textarea{
+  flex:1;
+  padding:10px;
+}
+button{
+  padding:10px;
   background:#667eea;
-  width:0%;
+  color:white;
+  border:none;
 }
 </style>
+
 </head>
 
 <body>
 
-<div class="topbar">
-  <div>XP: <span id="xp">0</span> | 🔥 <span id="streak">0</span></div>
-  <div>Level: <span id="level">1</span></div>
+<div class="sidebar">
+  <h3>💬 Chatter</h3>
+  <button onclick="newChat()">+ Ny chat</button>
+  <div id="chatList"></div>
 </div>
 
-<!-- START -->
-<div id="start" class="view active">
-  <div class="card">
-    <h2>Velg nivå</h2>
-    <select id="grade">
-      <option value="">Velg...</option>
-      <option>1-4</option>
-      <option>5-7</option>
-      <option>8-10</option>
-      <option>VG</option>
-    </select>
-    <button onclick="start()">Start</button>
-  </div>
+<div class="main">
+
+<div class="top">
+  <span id="user"></span>
+  <button onclick="logout()">Logg ut</button>
 </div>
 
-<!-- MENU -->
-<div id="menu" class="view">
-  <div class="card">
-    <button onclick="show('chat')">AI lærer</button>
-    <button onclick="show('quiz')">Quiz</button>
-    <button onclick="show('game')">Matte spill</button>
-  </div>
+<div class="messages" id="messages"></div>
+
+<div class="input">
+  <textarea id="msg"></textarea>
+  <button onclick="send()">Send</button>
 </div>
 
-<!-- CHAT -->
-<div id="chat" class="view">
-  <div class="card">
-    <textarea id="msg" placeholder="Spør om lekser, matte, norsk..."></textarea>
-    <button onclick="send()">Send</button>
-    <button onclick="speak()">🔊 Les opp</button>
-    <p id="chatOut"></p>
-    <button onclick="back()">←</button>
-  </div>
-</div>
-
-<!-- QUIZ -->
-<div id="quiz" class="view">
-  <div class="card">
-    <p id="q"></p>
-    <input id="ans">
-    <button onclick="check()">Svar</button>
-    <p id="res"></p>
-    <div class="bar"><div class="fill" id="bar"></div></div>
-    <button onclick="back()">←</button>
-  </div>
-</div>
-
-<!-- GAME -->
-<div id="game" class="view">
-  <div class="card">
-    <p id="mathQ"></p>
-    <input id="mathA">
-    <button onclick="checkMath()">Svar</button>
-    <button onclick="back()">←</button>
-  </div>
 </div>
 
 <script>
-let grade = null;
-let xp = parseInt(localStorage.getItem("xp")) || 0;
-let streak = parseInt(localStorage.getItem("streak")) || 0;
-let lastReply = "";
+let username = null;
+let currentChat = null;
 
-updateStats();
+/* =========================
+   🔐 LOGIN
+========================= */
+async function login(){
+ let u = prompt("Brukernavn");
+ let p = prompt("Passord");
 
-// NAV
-function show(id){
- document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
- document.getElementById(id).classList.add("active");
-}
-function back(){ show("menu"); }
+ let res = await fetch("/login",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({username:u,password:p})
+ });
 
-function start(){
- let g = document.getElementById("grade").value;
- if(!g){
-  alert("Velg nivå først!");
-  return;
- }
- grade = g;
- newQ();
- newMath();
- show("menu");
-}
+ let data = await res.json();
 
-// 🤖 AI CHAT
-async function send(){
- let input = document.getElementById("msg");
- let msg = input.value.trim();
- let out = document.getElementById("chatOut");
-
- if(!msg){
-  out.innerText="Skriv noe først!";
-  return;
- }
-
- out.innerText="Tenker...";
-
- try{
-  let res = await fetch("http://localhost:3000/ai",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({
-    message: msg,
-    system: "Du er en hjelpsom lærer. Forklar enkelt og tydelig."
-   })
+ if(data.success){
+  username = u;
+  document.getElementById("user").innerText = "👤 " + username;
+  loadChats();
+ } else {
+  alert("Feil login, lager bruker...");
+  await fetch("/register",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:u,password:p})
   });
-
-  if(!res.ok) throw new Error();
-
-  let data = await res.json();
-
-  lastReply = data.reply || "Ingen svar";
-  out.innerText = lastReply;
-
- } catch {
-  out.innerText="⚠️ Klarte ikke koble til AI";
+  login();
  }
-
- input.value="";
- input.focus();
 }
 
-// ENTER SEND
-document.getElementById("msg").addEventListener("keydown", function(e){
- if(e.key === "Enter" && !e.shiftKey){
-  e.preventDefault();
-  send();
- }
-});
+login();
 
-// 🔊 SPEAK
-function speak(){
- if(!lastReply) return;
- speechSynthesis.cancel();
- let u = new SpeechSynthesisUtterance(lastReply);
- u.lang = "no-NO";
- speechSynthesis.speak(u);
+/* =========================
+   💬 CHAT SYSTEM
+========================= */
+
+async function loadChats(){
+ let res = await fetch("/chats?user="+username);
+ let data = await res.json();
+
+ let list = document.getElementById("chatList");
+ list.innerHTML="";
+
+ data.forEach(c=>{
+  let div = document.createElement("div");
+  div.className="chat";
+  div.innerText="Chat " + c.id;
+  div.onclick = ()=>{ currentChat=c.id; loadMessages(); };
+  list.appendChild(div);
+ });
 }
 
-// QUIZ
-let currentQ = 0;
-
-function newQ(){
- if(!grade) return;
-
- let max = grade==="1-4" ? 10 : grade==="5-7" ? 20 : 50;
- let a=Math.floor(Math.random()*max);
- let b=Math.floor(Math.random()*max);
- currentQ=a+b;
-
- document.getElementById("q").innerText=`Hva er ${a}+${b}?`;
- document.getElementById("ans").value="";
- document.getElementById("ans").focus();
+async function newChat(){
+ let res = await fetch("/newchat",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({user:username})
+ });
+ let data = await res.json();
+ currentChat = data.id;
+ loadChats();
 }
 
-function check(){
- let val = parseInt(document.getElementById("ans").value);
+async function loadMessages(){
+ let res = await fetch("/messages?chat="+currentChat);
+ let data = await res.json();
 
- if(isNaN(val)){
-  document.getElementById("res").innerText="Skriv et tall!";
-  return;
- }
+ let box = document.getElementById("messages");
+ box.innerHTML="";
 
- if(val===currentQ){
-  streak++;
-  xp += 10 * streak;
-  document.getElementById("res").innerText="🔥 Riktig!";
- } else {
-  streak=0;
-  document.getElementById("res").innerText="❌ Feil!";
- }
-
- updateStats();
- newQ();
+ data.forEach(m=>{
+  box.innerHTML += "<div class='msg'><b>"+m.role+":</b> "+m.text+"</div>";
+ });
 }
 
-// GAME
-let mathAnswer = 0;
+/* =========================
+   🤖 AI SEND
+========================= */
+async function send(){
+ let text = document.getElementById("msg").value;
 
-function newMath(){
- if(!grade) return;
+ if(!text || !currentChat) return;
 
- let max = grade==="1-4" ? 10 : grade==="5-7" ? 12 : 20;
- let a=Math.floor(Math.random()*max);
- let b=Math.floor(Math.random()*max);
+ await fetch("/send",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({
+    chat: currentChat,
+    message: text
+  })
+ });
 
- mathAnswer = a*b;
- document.getElementById("mathQ").innerText=`${a} × ${b}`;
- document.getElementById("mathA").value="";
+ document.getElementById("msg").value="";
+ loadMessages();
 }
 
-function checkMath(){
- let val = parseInt(document.getElementById("mathA").value);
-
- if(isNaN(val)){
-  document.getElementById("mathQ").innerText="Skriv et tall!";
-  return;
- }
-
- if(val===mathAnswer){
-  xp+=20;
-  document.getElementById("mathQ").innerText="🔥 Riktig!";
- } else {
-  document.getElementById("mathQ").innerText="❌ Feil!";
- }
-
- updateStats();
- newMath();
-}
-
-// STATS
-function updateStats(){
- xp = Math.max(0, xp);
- streak = Math.max(0, streak);
-
- document.getElementById("xp").innerText=xp;
- document.getElementById("streak").innerText=streak;
-
- let level = Math.floor(xp/100)+1;
- document.getElementById("level").innerText=level;
-
- let progress = xp % 100;
- let bar = document.getElementById("bar");
- if(bar) bar.style.width = progress + "%";
-
- localStorage.setItem("xp", xp);
- localStorage.setItem("streak", streak);
+/* =========================
+   🔓 LOGOUT
+========================= */
+function logout(){
+ location.reload();
 }
 </script>
 
 </body>
 </html>
+`);
+});
+
+/* =========================
+   🔐 AUTH
+========================= */
+
+app.post("/register",(req,res)=>{
+ let {username,password} = req.body;
+ users.push({username,password});
+ res.json({success:true});
+});
+
+app.post("/login",(req,res)=>{
+ let {username,password} = req.body;
+ let user = users.find(u=>u.username===username && u.password===password);
+ if(user) res.json({success:true});
+ else res.json({success:false});
+});
+
+/* =========================
+   💬 CHAT BACKEND
+========================= */
+
+app.get("/chats",(req,res)=>{
+ let user = req.query.user;
+ res.json(chats[user] || []);
+});
+
+app.post("/newchat",(req,res)=>{
+ let user = req.body.user;
+
+ if(!chats[user]) chats[user]=[];
+
+ let chat = {id: Date.now(), messages:[]};
+ chats[user].push(chat);
+
+ res.json(chat);
+});
+
+app.get("/messages",(req,res)=>{
+ let chatId = parseInt(req.query.chat);
+
+ for(let u in chats){
+  let chat = chats[u].find(c=>c.id===chatId);
+  if(chat) return res.json(chat.messages);
+ }
+
+ res.json([]);
+});
+
+/* =========================
+   🤖 AI (ENKEL)
+========================= */
+
+app.post("/send",(req,res)=>{
+ let {chat,message} = req.body;
+
+ for(let u in chats){
+  let c = chats[u].find(x=>x.id===chat);
+  if(c){
+    c.messages.push({role:"Du", text:message});
+
+    // 🔥 AI SVAR (bytt med OpenAI senere)
+    let reply = "AI svar: " + message;
+
+    c.messages.push({role:"AI", text:reply});
+    return res.json({ok:true});
+  }
+ }
+
+ res.json({error:true});
+});
+
+app.listen(3000, ()=>console.log("🚀 Server: http://localhost:3000"));
