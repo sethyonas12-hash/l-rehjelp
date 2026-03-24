@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Lærer AI PRO ULTIMATE</title>
+<title>Lærer AI Enkel</title>
 
 <style>
 body {
@@ -17,39 +17,38 @@ body {
 .card {
   background:white;
   color:black;
-  padding:25px;
-  border-radius:20px;
+  padding:20px;
+  border-radius:15px;
   margin:15px;
-  box-shadow:0 10px 25px rgba(0,0,0,0.2);
 }
 
 button {
-  padding:15px;
+  padding:12px;
   border:none;
-  border-radius:12px;
+  border-radius:10px;
   background:#667eea;
   color:white;
-  cursor:pointer;
   width:100%;
   margin-top:10px;
+  cursor:pointer;
 }
 
 .topbar {
-  padding:15px;
   background:black;
+  padding:10px;
   display:flex;
   justify-content:space-between;
 }
 
 textarea, input, select {
   width:100%;
-  padding:12px;
+  padding:10px;
   margin-top:10px;
-  border-radius:10px;
+  border-radius:8px;
 }
 
 .bar {
-  height:10px;
+  height:8px;
   background:#ccc;
   border-radius:10px;
 }
@@ -95,17 +94,10 @@ textarea, input, select {
 <!-- CHAT -->
 <div id="chat" class="view">
   <div class="card">
-    <textarea id="msg" placeholder="Spør om noe..."></textarea>
+    <textarea id="msg" placeholder="Spør om lekser, matte, norsk..."></textarea>
     <button onclick="send()">Send</button>
-    <button onclick="speak()">Les opp</button>
+    <button onclick="speak()">🔊 Les opp</button>
     <p id="chatOut"></p>
-
-    <div style="margin-top:15px; font-size:14px;">
-      <b>Tips:</b><br>
-      Skriv: "Hjelp meg med 2x + 4 = 10"<br><br>
-      AI-en vil guide deg steg for steg 🎓
-    </div>
-
     <button onclick="back()">←</button>
   </div>
 </div>
@@ -138,30 +130,6 @@ let xp = parseInt(localStorage.getItem("xp")) || 0;
 let streak = parseInt(localStorage.getItem("streak")) || 0;
 let lastReply = "";
 
-// 🎓 SUPER PROMPT
-function getTeacherPrompt(){
-return `
-Rolle:
-Du er en ekspertpedagog med over 20 års erfaring. Du hjelper eleven å forstå, ikke bare få svar.
-
-Instrukser:
-- Tilpass til klassetrinn: ${grade}
-- Ikke gi fasit direkte
-- Still spørsmål
-- Bruk analogier
-- Del opp i steg
-- Ros innsats
-
-Regler:
-- Still minst ett spørsmål
-- Kort svar først
-- Bygg forståelse
-
-Mål:
-Brukeren skal forstå og mestre, ikke bare svare riktig.
-`;
-}
-
 updateStats();
 
 // NAV
@@ -183,9 +151,10 @@ function start(){
  show("menu");
 }
 
-// 🤖 CHAT
+// 🤖 AI CHAT
 async function send(){
- let msg = document.getElementById("msg").value.trim();
+ let input = document.getElementById("msg");
+ let msg = input.value.trim();
  let out = document.getElementById("chatOut");
 
  if(!msg){
@@ -200,31 +169,40 @@ async function send(){
    method:"POST",
    headers:{"Content-Type":"application/json"},
    body:JSON.stringify({
-    system: getTeacherPrompt(),
     message: msg,
-    grade: grade
+    system: "Du er en hjelpsom lærer. Forklar enkelt og tydelig."
    })
   });
 
   if(!res.ok) throw new Error();
 
   let data = await res.json();
-  lastReply = data.reply || "Ingen respons";
+
+  lastReply = data.reply || "Ingen svar";
   out.innerText = lastReply;
 
  } catch {
-  out.innerText="⚠️ AI server ikke tilgjengelig";
+  out.innerText="⚠️ Klarte ikke koble til AI";
  }
 
- document.getElementById("msg").value="";
+ input.value="";
+ input.focus();
 }
+
+// ENTER SEND
+document.getElementById("msg").addEventListener("keydown", function(e){
+ if(e.key === "Enter" && !e.shiftKey){
+  e.preventDefault();
+  send();
+ }
+});
 
 // 🔊 SPEAK
 function speak(){
  if(!lastReply) return;
  speechSynthesis.cancel();
- let u=new SpeechSynthesisUtterance(lastReply);
- u.lang="no-NO";
+ let u = new SpeechSynthesisUtterance(lastReply);
+ u.lang = "no-NO";
  speechSynthesis.speak(u);
 }
 
