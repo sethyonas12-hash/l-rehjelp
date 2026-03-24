@@ -1,303 +1,264 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const app = express();
-
-app.use(bodyParser.json());
-
-/* =========================
-   🧠 "DATABASE" (MIDlertidig)
-========================= */
-let users = [];
-let chats = {};
-
-/* =========================
-   🌐 FRONTEND (HTML)
-========================= */
-app.get("/", (req,res)=>{
-res.send(`
 <!DOCTYPE html>
-<html>
+<html lang="no">
 <head>
-<title>AI Skole Norge</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skoleplattform</title>
+    <style>
+        /* Generell stil */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f0f4f8;
+        }
 
-<style>
-body{
-  margin:0;
-  font-family:Arial;
-  display:flex;
-  height:100vh;
-  background:#1e3c72;
-  color:white;
-}
+        header {
+            background-color: #4a90e2;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
 
-/* SIDEBAR */
-.sidebar{
-  width:260px;
-  background:#111;
-  padding:15px;
-  overflow:auto;
-}
-.chat{
-  background:#222;
-  padding:10px;
-  margin-top:5px;
-  border-radius:8px;
-  cursor:pointer;
-}
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
 
-/* MAIN */
-.main{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-}
+        h2 {
+            color: #333;
+        }
 
-/* HEADER */
-.top{
-  background:black;
-  padding:10px;
-  display:flex;
-  justify-content:space-between;
-}
+        input, select, button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
 
-/* CHAT */
-.messages{
-  flex:1;
-  overflow:auto;
-  padding:10px;
-}
-.msg{
-  background:white;
-  color:black;
-  padding:10px;
-  margin-top:5px;
-  border-radius:10px;
-}
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
 
-/* INPUT */
-.input{
-  display:flex;
-}
-textarea{
-  flex:1;
-  padding:10px;
-}
-button{
-  padding:10px;
-  background:#667eea;
-  color:white;
-  border:none;
-}
-</style>
+        button:hover {
+            background-color: #357ab8;
+        }
 
+        .hidden {
+            display: none;
+        }
+
+        .menu button {
+            width: 48%;
+            margin: 1%;
+        }
+
+        .quiz, .gloser, .chat {
+            margin-top: 20px;
+        }
+
+        .question {
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
-
 <body>
+    <header>
+        <h1>Skoleplattform for elever</h1>
+    </header>
 
-<div class="sidebar">
-  <h3>💬 Chatter</h3>
-  <button onclick="newChat()">+ Ny chat</button>
-  <div id="chatList"></div>
-</div>
+    <div class="container" id="register-section">
+        <h2>Opprett bruker</h2>
+        <input type="text" id="username" placeholder="Skriv inn brukernavn">
+        <select id="grade">
+            <option value="1-4">1-4 trinn</option>
+            <option value="5-7">5-7 trinn</option>
+            <option value="8-10">8-10 trinn</option>
+            <option value="vg1-vg3">VG1-VG3</option>
+        </select>
+        <button onclick="registerUser()">Fortsett</button>
+    </div>
 
-<div class="main">
+    <div class="container hidden" id="menu-section">
+        <h2>Velg funksjon</h2>
+        <div class="menu">
+            <button onclick="showSection('chat')">AI Chat</button>
+            <button onclick="showSection('gloser')">Gloseprøve</button>
+            <button onclick="showSection('quiz')">Quiz</button>
+        </div>
+    </div>
 
-<div class="top">
-  <span id="user"></span>
-  <button onclick="logout()">Logg ut</button>
-</div>
+    <!-- AI Chat -->
+    <div class="container hidden" id="chat-section">
+        <h2>AI Chat - spør om skolefag</h2>
+        <textarea id="chat-input" placeholder="Skriv spørsmål her..." rows="3"></textarea>
+        <button onclick="askChat()">Spør</button>
+        <div id="chat-output" style="margin-top:10px; border:1px solid #ccc; padding:10px; border-radius:5px; min-height:50px;"></div>
+    </div>
 
-<div class="messages" id="messages"></div>
+    <!-- Gloseprøve -->
+    <div class="container hidden" id="gloser-section">
+        <h2>Gloseprøve</h2>
+        <input type="text" id="word-input" placeholder="Skriv ord du vil øve på, kommaseparert">
+        <button onclick="startGlose()">Start øving</button>
+        <div id="gloser-output" style="margin-top:10px;"></div>
+    </div>
 
-<div class="input">
-  <textarea id="msg"></textarea>
-  <button onclick="send()">Send</button>
-</div>
+    <!-- Quiz -->
+    <div class="container hidden" id="quiz-section">
+        <h2>Quiz</h2>
+        <select id="subject">
+            <option value="matematikk">Matematikk</option>
+            <option value="norsk">Norsk</option>
+            <option value="engelsk">Engelsk</option>
+            <option value="naturfag">Naturfag</option>
+        </select>
+        <button onclick="startQuiz()">Start Quiz</button>
+        <div id="quiz-output" style="margin-top:10px;"></div>
+    </div>
 
-</div>
+    <script>
+        let username = '';
+        let grade = '';
 
-<script>
-let username = null;
-let currentChat = null;
+        function registerUser() {
+            username = document.getElementById('username').value;
+            grade = document.getElementById('grade').value;
 
-/* =========================
-   🔐 LOGIN
-========================= */
-async function login(){
- let u = prompt("Brukernavn");
- let p = prompt("Passord");
+            if(username === '') {
+                alert('Skriv inn et brukernavn');
+                return;
+            }
 
- let res = await fetch("/login",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:u,password:p})
- });
+            document.getElementById('register-section').classList.add('hidden');
+            document.getElementById('menu-section').classList.remove('hidden');
+        }
 
- let data = await res.json();
+        function showSection(section) {
+            document.getElementById('chat-section').classList.add('hidden');
+            document.getElementById('gloser-section').classList.add('hidden');
+            document.getElementById('quiz-section').classList.add('hidden');
 
- if(data.success){
-  username = u;
-  document.getElementById("user").innerText = "👤 " + username;
-  loadChats();
- } else {
-  alert("Feil login, lager bruker...");
-  await fetch("/register",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username:u,password:p})
-  });
-  login();
- }
-}
+            if(section === 'chat') document.getElementById('chat-section').classList.remove('hidden');
+            if(section === 'gloser') document.getElementById('gloser-section').classList.remove('hidden');
+            if(section === 'quiz') document.getElementById('quiz-section').classList.remove('hidden');
+        }
 
-login();
+        // Enkel AI Chat simulering
+        function askChat() {
+            const question = document.getElementById('chat-input').value;
+            const output = document.getElementById('chat-output');
 
-/* =========================
-   💬 CHAT SYSTEM
-========================= */
+            if(question === '') {
+                alert('Skriv et spørsmål');
+                return;
+            }
 
-async function loadChats(){
- let res = await fetch("/chats?user="+username);
- let data = await res.json();
+            // Her kan man koble til en ekte AI senere
+            output.innerHTML += `<p><b>${username}:</b> ${question}</p>`;
+            output.innerHTML += `<p><b>AI:</b> Dette er et eksempel-svar for ${grade} trinn.</p>`;
+            document.getElementById('chat-input').value = '';
+        }
 
- let list = document.getElementById("chatList");
- list.innerHTML="";
+        // Gloseprøve funksjon
+        let words = [];
+        let currentWord = 0;
 
- data.forEach(c=>{
-  let div = document.createElement("div");
-  div.className="chat";
-  div.innerText="Chat " + c.id;
-  div.onclick = ()=>{ currentChat=c.id; loadMessages(); };
-  list.appendChild(div);
- });
-}
+        function startGlose() {
+            const input = document.getElementById('word-input').value;
+            if(input === '') return alert('Skriv inn ord');
 
-async function newChat(){
- let res = await fetch("/newchat",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:username})
- });
- let data = await res.json();
- currentChat = data.id;
- loadChats();
-}
+            words = input.split(',').map(w => w.trim());
+            currentWord = 0;
+            showNextWord();
+        }
 
-async function loadMessages(){
- let res = await fetch("/messages?chat="+currentChat);
- let data = await res.json();
+        function showNextWord() {
+            if(currentWord >= words.length) {
+                document.getElementById('gloser-output').innerHTML = '<p>Du har øvd på alle ordene!</p>';
+                return;
+            }
+            const word = words[currentWord];
+            document.getElementById('gloser-output').innerHTML = `
+                <p>Hva er betydningen av: <b>${word}</b> ?</p>
+                <input type='text' id='answer'>
+                <button onclick='checkAnswer()'>Sjekk svar</button>
+            `;
+        }
 
- let box = document.getElementById("messages");
- box.innerHTML="";
+        function checkAnswer() {
+            const answer = document.getElementById('answer').value;
+            // Ingen sjekk implementert, bare fortsetter
+            currentWord++;
+            showNextWord();
+        }
 
- data.forEach(m=>{
-  box.innerHTML += "<div class='msg'><b>"+m.role+":</b> "+m.text+"</div>";
- });
-}
+        // Quiz funksjon
+        const sampleQuestions = {
+            matematikk: [
+                {q: 'Hva er 2 + 2?', a: '4'},
+                {q: 'Hva er 5 * 6?', a: '30'}
+            ],
+            norsk: [
+                {q: 'Hva heter hovedstaden i Norge?', a: 'Oslo'},
+                {q: 'Hva er synonym for "glad"?', a: 'lykkelig'}
+            ],
+            engelsk: [
+                {q: 'Translate: cat', a: 'katt'},
+                {q: 'Translate: house', a: 'hus'}
+            ],
+            naturfag: [
+                {q: 'Hva heter prosessen der planter lager mat?', a: 'Fotosyntese'},
+                {q: 'Hva er vannets kjemiske formel?', a: 'H2O'}
+            ]
+        };
 
-/* =========================
-   🤖 AI SEND
-========================= */
-async function send(){
- let text = document.getElementById("msg").value;
+        let quizIndex = 0;
+        let currentQuiz = [];
 
- if(!text || !currentChat) return;
+        function startQuiz() {
+            const subject = document.getElementById('subject').value;
+            currentQuiz = sampleQuestions[subject];
+            quizIndex = 0;
+            showQuizQuestion();
+        }
 
- await fetch("/send",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({
-    chat: currentChat,
-    message: text
-  })
- });
+        function showQuizQuestion() {
+            if(quizIndex >= currentQuiz.length) {
+                document.getElementById('quiz-output').innerHTML = '<p>Du har fullført quizen!</p>';
+                return;
+            }
 
- document.getElementById("msg").value="";
- loadMessages();
-}
+            const q = currentQuiz[quizIndex];
+            document.getElementById('quiz-output').innerHTML = `
+                <div class='question'>${q.q}</div>
+                <input type='text' id='quiz-answer'>
+                <button onclick='checkQuizAnswer()'>Sjekk svar</button>
+            `;
+        }
 
-/* =========================
-   🔓 LOGOUT
-========================= */
-function logout(){
- location.reload();
-}
-</script>
+        function checkQuizAnswer() {
+            const userAnswer = document.getElementById('quiz-answer').value.trim();
+            const correctAnswer = currentQuiz[quizIndex].a;
 
+            if(userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                alert('Riktig!');
+            } else {
+                alert('Feil! Riktig svar: ' + correctAnswer);
+            }
+            quizIndex++;
+            showQuizQuestion();
+        }
+
+    </script>
 </body>
 </html>
-`);
-});
-
-/* =========================
-   🔐 AUTH
-========================= */
-
-app.post("/register",(req,res)=>{
- let {username,password} = req.body;
- users.push({username,password});
- res.json({success:true});
-});
-
-app.post("/login",(req,res)=>{
- let {username,password} = req.body;
- let user = users.find(u=>u.username===username && u.password===password);
- if(user) res.json({success:true});
- else res.json({success:false});
-});
-
-/* =========================
-   💬 CHAT BACKEND
-========================= */
-
-app.get("/chats",(req,res)=>{
- let user = req.query.user;
- res.json(chats[user] || []);
-});
-
-app.post("/newchat",(req,res)=>{
- let user = req.body.user;
-
- if(!chats[user]) chats[user]=[];
-
- let chat = {id: Date.now(), messages:[]};
- chats[user].push(chat);
-
- res.json(chat);
-});
-
-app.get("/messages",(req,res)=>{
- let chatId = parseInt(req.query.chat);
-
- for(let u in chats){
-  let chat = chats[u].find(c=>c.id===chatId);
-  if(chat) return res.json(chat.messages);
- }
-
- res.json([]);
-});
-
-/* =========================
-   🤖 AI (ENKEL)
-========================= */
-
-app.post("/send",(req,res)=>{
- let {chat,message} = req.body;
-
- for(let u in chats){
-  let c = chats[u].find(x=>x.id===chat);
-  if(c){
-    c.messages.push({role:"Du", text:message});
-
-    // 🔥 AI SVAR (bytt med OpenAI senere)
-    let reply = "AI svar: " + message;
-
-    c.messages.push({role:"AI", text:reply});
-    return res.json({ok:true});
-  }
- }
-
- res.json({error:true});
-});
-
-app.listen(3000, ()=>console.log("🚀 Server: http://localhost:3000"));
